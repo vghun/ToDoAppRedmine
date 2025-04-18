@@ -1,90 +1,46 @@
-name: CI + Jira + Slack Notification
+
+name: CI/CD with GitHub, Jira and Slack
 
 on:
-  push:
-    branches: [main]
-
   pull_request:
-    types: [opened, synchronize, closed]
-    branches: [main]
-
-  workflow_dispatch:
-
-  repository_dispatch:
-    types: [issue-done]
+    types: [opened, synchronize, reopened, closed]
 
 jobs:
-  ci-check:
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+  build-and-test:
+    if: github.event.pull_request.merged != true
+    runs-on: ubuntu-latest
+
+    steps:
+      - run: echo Hello world
+
+  update-jira:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Python (nếu có kiểm thử)
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Cài đặt phụ thuộc (nếu có)
+      - name: Extract Jira Issue Key
+        id: extract
         run: |
-          pip install -r requirements.txt || echo "Không có requirements.txt"
-
-      - name: Chạy kiểm thử
-        run: |
-          pytest tests/test_app.py || echo "Không có kiểm thử"
-
-  update-jira-on-merge:
-    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
-    runs-on: ubuntu-latest
-    outputs:
-      issue_key: ${{ steps.extract-jira.outputs.issue_key }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Extract Jira issue key from commit
-        id: extract-jira
-        run: |
-          ISSUE_KEY=$(git log -1 --pretty=%B | grep -oE '[A-Z]+-[0-9]+' | head -1)
-          echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
+          echo "JIRA_KEY=$(echo '${{ github.event.pull_request.title }}' | grep -o '[A-Z]\+-[0-9]\+')" >> $GITHUB_OUTPUT
 
       - name: Login to Jira
-        if: steps.extract-jira.outputs.issue_key != ''
         uses: atlassian/gajira-login@v3
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
-          JIRA_USER_EMAIL: ${{ secrets.JIRA_USERNAME }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_USER_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
 
       - name: Transition Jira issue to Done
-        if: steps.extract-jira.outputs.issue_key != ''
         uses: atlassian/gajira-transition@v3
         with:
-          issue: ${{ steps.extract-jira.outputs.issue_key }}
+          issue: ${{ steps.extract.outputs.JIRA_KEY }}
           transition: Done
-
-      - name: Dispatch Slack notification event
-        if: steps.extract-jira.outputs.issue_key != ''
-        uses: peter-evans/repository-dispatch@v3
+          
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1.24.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          event-type: issue-done
-          client-payload: |
+          payload: |
             {
-              "issueKey": "${{ steps.extract-jira.outputs.issue_key }}",
-              "summary": "Issue đã được chuyển sang trạng thái Done"
+              "text": ":white_check_mark: Jira issue *${{ steps.extract.outputs.JIRA_KEY }}* has been closed successfully!"
             }
-
-  notify-slack:
-    if: github.event_name == 'repository_dispatch' && github.event.action == 'issue-done'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send Slack notification
-        uses: slackapi/slack-github-action@v1.27.0
-        with:
-          channel-id: 'C08P1JK260H' # Thay bằng ID kênh Slack thật
-          slack-message: |
-            🎉 Jira issue *${{ github.event.client_payload.issueKey }}* đã được chuyển sang trạng thái *Done*!
         env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
