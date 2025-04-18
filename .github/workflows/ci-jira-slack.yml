@@ -2,33 +2,43 @@ name: CI + Jira + Slack Notification
 
 on:
   pull_request:
+    types: [opened, synchronize]
     branches: [main]
+
+  pull_request_target:
+    types: [closed]
 
   repository_dispatch:
     types: [issue-done]
 
 jobs:
-  update-jira:
+  ci-check:
     if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python (optional nếu có test)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run CI tasks (replace with real tasks)
+        run: echo "Run your build/test here"
+
+  update-jira-on-merge:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Extract Jira issue key
+      - name: Extract Jira issue key from last commit
         id: extract-jira
         run: |
           ISSUE_KEY=$(git log -1 --pretty=%B | grep -oE '[A-Z]+-[0-9]+' | head -1)
-          if [ -z "$ISSUE_KEY" ]; then
-            echo "No Jira issue key found"
-            exit 0
-          fi
           echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
 
       - name: Login to Jira
@@ -39,23 +49,34 @@ jobs:
           JIRA_USER_EMAIL: ${{ secrets.JIRA_USERNAME }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
 
-      - name: Transition Jira issue
+      - name: Transition Jira issue to Done
         if: steps.extract-jira.outputs.issue_key
         uses: atlassian/gajira-transition@v3
         with:
           issue: ${{ steps.extract-jira.outputs.issue_key }}
           transition: Done
 
+      - name: Dispatch event to trigger Slack notify
+        if: steps.extract-jira.outputs.issue_key
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: issue-done
+          client-payload: |
+            {
+              "issueKey": "${{ steps.extract-jira.outputs.issue_key }}",
+              "summary": "Issue đã được chuyển sang trạng thái Done"
+            }
+
   notify-slack:
     if: github.event_name == 'repository_dispatch' && github.event.action == 'issue-done'
     runs-on: ubuntu-latest
-
     steps:
       - name: Send Slack notification
         uses: slackapi/slack-github-action@v1.27.0
         with:
-          channel-id: 'C08P1JK260H'
+          channel-id: 'C08P1JK260H'  # Thay bằng ID kênh Slack của bạn
           slack-message: |
-            Jira issue *${{ github.event.client_payload.issueKey }}* - *${{ github.event.client_payload.summary }}* đã được đóng thành công!
+            🎉 Jira issue *${{ github.event.client_payload.issueKey }}* đã được chuyển sang trạng thái *Done*!
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
