@@ -2,16 +2,22 @@ name: CI + Jira + Slack Notification
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
   pull_request:
-    types: [opened, synchronize, closed]
-    branches: [main]
+    types:
+      - opened
+      - synchronize
+      - closed
+    branches:
+      - main
 
   workflow_dispatch:
 
   repository_dispatch:
-    types: [issue-done]
+    types:
+      - issue-done
 
 
 jobs:
@@ -47,7 +53,7 @@ jobs:
         id: extract-jira
         run: |
           ISSUE_KEY=$(git log -1 --pretty=%B | grep -oE '[A-Z]+-[0-9]+' | head -1)
-          echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
+          echo "issue_key=$ISSUE_KEY" >> $GITHUB_ENV
 
       - name: Login to Jira
         if: steps.extract-jira.outputs.issue_key
