@@ -13,9 +13,10 @@ on:
   repository_dispatch:
     types: [issue-done]
 
+
 jobs:
   ci-check:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -35,7 +36,7 @@ jobs:
           pytest tests/test_app.py
 
   update-jira-on-merge:
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
