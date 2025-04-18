@@ -1,22 +1,6 @@
-name: CI + Jira + Slack Notification
-
-on:
-  push:
-    branches: [main]
-
-  pull_request:
-    types: [opened, synchronize, closed]
-    branches: [main]
-
-  workflow_dispatch:
-
-  repository_dispatch:
-    types: [issue-done]
-
-
 jobs:
   ci-check:
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -36,9 +20,8 @@ jobs:
           pytest tests/test_app.py
 
   update-jira-on-merge:
-    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -48,6 +31,7 @@ jobs:
         run: |
           ISSUE_KEY=$(git log -1 --pretty=%B | grep -oE '[A-Z]+-[0-9]+' | head -1)
           echo "issue_key=$ISSUE_KEY" >> $GITHUB_OUTPUT
+          echo "Jira Issue Key: $ISSUE_KEY"  # Debug
 
       - name: Login to Jira
         if: steps.extract-jira.outputs.issue_key
@@ -80,6 +64,9 @@ jobs:
     if: github.event_name == 'repository_dispatch' && github.event.action == 'issue-done'
     runs-on: ubuntu-latest
     steps:
+      - name: Debug Slack Payload
+        run: echo "Slack Payload: ${{ github.event.client_payload }}"
+
       - name: Send Slack notification
         uses: slackapi/slack-github-action@v1.27.0
         with:
