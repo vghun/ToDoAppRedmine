@@ -1,4 +1,5 @@
 name: CI + Jira + Slack Notification
+
 on:
   push:
     branches: [main]
@@ -12,7 +13,6 @@ on:
   repository_dispatch:
     types: [issue-done]
 
-
 jobs:
   ci-check:
     if: github.event_name == 'pull_request'
@@ -21,13 +21,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python (optional nếu có test)
+      - name: Setup Python (nếu có kiểm thử)
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Run CI tasks (replace with real tasks)
-        run: echo "Run your build/test here"
+      - name: Cài đặt phụ thuộc (nếu có)
+        run: |
+          pip install -r requirements.txt
+
+      - name: Chạy kiểm thử
+        run: |
+          pytest tests/test_app.py
 
   update-jira-on-merge:
     if: github.event.pull_request.merged == true
