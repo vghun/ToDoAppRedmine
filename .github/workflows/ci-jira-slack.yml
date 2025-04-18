@@ -50,4 +50,4 @@ jobs:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
         with:
           channel-id: 'C08P1JK260H' # Thay bằng ID thật của kênh Slack
-          slack-message: '✅ Jira issue *${{ github.event.client_payload.issueKey }}* - *${{ github.event.client_payload.summary }}* đã được đóng thành công!'
+          slack-message: ' Jira issue *${{ github.event.client_payload.issueKey }}* - *${{ github.event.client_payload.summary }}* đã được đóng thành công!'
