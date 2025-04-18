@@ -11,9 +11,15 @@ jobs:
   update-jira:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Extract Jira issue key
         id: extract-jira
@@ -43,11 +49,13 @@ jobs:
   notify-slack:
     if: github.event_name == 'repository_dispatch' && github.event.action == 'issue-done'
     runs-on: ubuntu-latest
+
     steps:
       - name: Send Slack notification
         uses: slackapi/slack-github-action@v1.27.0
+        with:
+          channel-id: 'C08P1JK260H'
+          slack-message: |
+            Jira issue *${{ github.event.client_payload.issueKey }}* - *${{ github.event.client_payload.summary }}* đã được đóng thành công!
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-        with:
-          channel-id: 'C08P1JK260H' # Thay bằng ID thật của kênh Slack
-          slack-message: ' Jira issue *${{ github.event.client_payload.issueKey }}* - *${{ github.event.client_payload.summary }}* đã được đóng thành công!'
