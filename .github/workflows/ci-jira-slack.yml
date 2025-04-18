@@ -1,15 +1,17 @@
 name: CI + Jira + Slack Notification
-
 on:
-  pull_request:
-    types: [opened, synchronize]
+  push:
     branches: [main]
 
-  pull_request_target:
-    types: [closed]
+  pull_request:
+    types: [opened, synchronize, closed]
+    branches: [main]
+
+  workflow_dispatch:
 
   repository_dispatch:
     types: [issue-done]
+
 
 jobs:
   ci-check:
